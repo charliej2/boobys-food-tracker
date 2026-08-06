@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trakd — Nutrition Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2f855a" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Trakd" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Trakd</h1>
+    <p class="subtitle">See how today's food stacks up against your targets</p>
+    <p class="data-credit">Food data from USDA FoodData Central</p>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: Food search, estimator, meals -->
+    <section class="panel food-panel">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="search">Search</button>
+        <button class="tab-btn" data-tab="estimate">Estimate a Meal</button>
+        <button class="tab-btn" data-tab="meals">My Meals</button>
+      </div>
+
+      <!-- Search tab -->
+      <div id="tab-search" class="tab-panel">
+        <input
+          type="text"
+          id="search-input"
+          placeholder="Search foods (e.g. chicken, rice, spinach)"
+          autocomplete="off"
+        />
+        <button id="toggle-supplement-btn" class="secondary-btn full-width">+ Add Supplement / Restaurant Item / Custom Food</button>
+
+        <div id="supplement-form" class="supplement-form hidden">
+          <input type="text" id="supplement-name" placeholder="Name (e.g. Vitamin D3 1000 IU, or Johnny Gio's Meatballs)" />
+          <p class="form-hint">Enter the amount of each nutrient per single serving/dose. Leave blank for anything not applicable.</p>
+          <div id="supplement-fields" class="supplement-fields"></div>
+          <div class="form-actions">
+            <button id="supplement-cancel-btn" class="secondary-btn">Cancel</button>
+            <button id="supplement-add-btn" class="primary-btn">Add to Log</button>
+          </div>
+        </div>
+
+        <div id="food-list" class="food-list"></div>
+      </div>
+
+      <!-- Estimate tab -->
+      <div id="tab-estimate" class="tab-panel hidden">
+        <p class="form-hint">
+          Describe what you ate, even multiple items at once — e.g. "4 meatballs and half a
+          small plate of spaghetti" or "small meatballs from Johnny Gio's". No free database
+          has exact nutrition for a specific local restaurant, so this gives a generic
+          USDA-based estimate for each item. Not exact — just a much better starting point
+          than guessing blind. For well-known chains, you may get more accurate numbers from
+          the chain's own published nutrition info, entered manually below.
+        </p>
+        <input type="text" id="estimate-input" placeholder='e.g. "4 meatballs and half a small plate of spaghetti"' autocomplete="off" />
+        <button id="estimate-btn" class="primary-btn full-width">Estimate</button>
+        <div id="estimate-results" class="estimate-results"></div>
+      </div>
+
+      <!-- Meals tab -->
+      <div id="tab-meals" class="tab-panel hidden">
+        <button id="create-meal-btn" class="secondary-btn full-width">+ Create New Meal</button>
+
+        <div id="meal-builder" class="meal-builder hidden">
+          <input type="text" id="meal-name-input" placeholder="Meal name (e.g. Sunday Breakfast)" />
+          <input type="text" id="meal-ingredient-search" placeholder="Search foods to add as ingredients" autocomplete="off" />
+          <div id="meal-ingredient-results" class="food-list"></div>
+          <h3 class="meal-builder-subheading">Ingredients</h3>
+          <div id="meal-draft-list" class="selected-list">
+            <p class="empty-state">No ingredients added yet.</p>
+          </div>
+          <div class="form-actions">
+            <button id="meal-builder-cancel-btn" class="secondary-btn">Cancel</button>
+            <button id="meal-builder-save-btn" class="primary-btn">Save Meal</button>
+          </div>
+        </div>
+
+        <div id="saved-meals-list" class="saved-meals-list"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Targets, selected items, totals, insights -->
+    <section class="panel selected-panel">
+      <div class="section-header">
+        <h2>Targets</h2>
+        <button id="toggle-settings-btn" class="secondary-btn">⚙ Personalize</button>
+      </div>
+
+      <div id="settings-panel" class="settings-panel hidden">
+        <div class="settings-grid">
+          <label class="target-field">
+            <span>Units</span>
+            <select id="unit-system-select" class="target-input">
+              <option value="metric">Metric (kg / cm)</option>
+              <option value="imperial">Imperial (lb / in)</option>
+            </select>
+          </label>
+          <label class="target-field">
+            <span>Energy unit</span>
+            <select id="energy-unit-select" class="target-input">
+              <option value="kcal">Calories (kcal)</option>
+              <option value="kJ">Kilojoules (kJ)</option>
+            </select>
+          </label>
+          <label class="target-field">
+            <span>Reference region</span>
+            <select id="region-select" class="target-input">
+              <option value="usa">USA (FDA Daily Values)</option>
+              <option value="australia">Australia (NHMRC NRVs)</option>
+            </select>
+          </label>
+        </div>
+
+        <h3 class="meal-builder-subheading">Calculate recommended targets from my stats</h3>
+        <p class="form-hint">
+          Estimates daily calorie needs (Mifflin-St Jeor) and pulls region-specific
+          reference values for everything else. This is general population guidance,
+          not personalized medical advice — you can always edit any target by hand.
+        </p>
+        <div class="settings-grid">
+          <label class="target-field">
+            <span>Sex</span>
+            <select id="biometric-sex" class="target-input">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </label>
+          <label class="target-field">
+            <span>Age (years)</span>
+            <input type="number" id="biometric-age" class="target-input" min="1" max="120" value="30" />
+          </label>
+          <label class="target-field">
+            <span id="biometric-weight-label">Weight (kg)</span>
+            <input type="number" id="biometric-weight" class="target-input" min="0" value="75" />
+          </label>
+          <label class="target-field">
+            <span id="biometric-height-label">Height (cm)</span>
+            <input type="number" id="biometric-height" class="target-input" min="0" value="175" />
+          </label>
+          <label class="target-field">
+            <span>Activity level</span>
+            <select id="biometric-activity" class="target-input"></select>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button id="calculate-targets-btn" class="primary-btn">Calculate &amp; Apply My Targets</button>
+        </div>
+        <p id="calculated-summary" class="form-hint"></p>
+      </div>
+
+      <div class="targets-form" id="targets-form"></div>
+      <p class="form-hint" id="targets-hint">Macro targets are editable above. Micronutrient targets use FDA Daily Values.</p>
+
+      <h2>Today's Log</h2>
+      <div id="selected-list" class="selected-list">
+        <p class="empty-state">Nothing logged yet. Search on the left and click a food to add it.</p>
+      </div>
+
+      <h2>Totals</h2>
+      <div class="totals-wrap">
+        <div class="macro-totals" id="macro-totals"></div>
+        <div class="micro-totals">
+          <h3>Minerals</h3>
+          <div id="mineral-totals" class="micro-grid"></div>
+        </div>
+        <div class="micro-totals">
+          <h3>Vitamins</h3>
+          <div id="vitamin-totals" class="micro-grid"></div>
+        </div>
+      </div>
+
+      <h2>Ratios</h2>
+      <div id="ratio-list" class="ratio-list"></div>
+
+      <h2>Nutrient Interaction Flags</h2>
+      <p class="form-hint">General nutrition-science guidance based on today's totals — not medical advice.</p>
+      <div id="flag-list" class="flag-list"></div>
+
+      <h2>Best Next Food</h2>
+      <div id="recommender" class="recommender">
+        <button id="find-food-btn" class="primary-btn">Find a food to close my biggest gap</button>
+        <div id="recommender-result" class="recommender-result"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((err) => {
+          console.error("Service worker registration failed:", err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
