@@ -1,9 +1,9 @@
-// Service worker: caches the static app shell so Trakd loads offline and
-// installs as a PWA. Deliberately does NOT cache USDA FoodData Central API
-// responses — nutrition search results should always come from the live
-// API, never a stale cached copy. Bump CACHE_NAME whenever app shell files
-// change so old caches are cleared out on the next visit.
-const CACHE_NAME = "trakd-shell-v4";
+// Service worker: caches the static app shell so Booby's Food Tracker loads
+// offline and installs as a PWA. Deliberately does NOT cache USDA FoodData
+// Central API responses — nutrition search results should always come from
+// the live API, never a stale cached copy. Bump CACHE_NAME whenever app
+// shell files change so old caches are cleared out on the next visit.
+const CACHE_NAME = "trakd-shell-v5";
 const APP_SHELL = [
   "./",
   "./index.html",

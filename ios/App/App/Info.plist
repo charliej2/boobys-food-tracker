@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Trakd</string>
+        <string>Booby's Food Tracker</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -67,6 +67,6 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Trakd uses your camera to scan product barcodes and look up their nutrition info.</string>
+	<string>Booby's Food Tracker uses your camera to scan product barcodes and look up their nutrition info.</string>
 </dict>
 </plist>

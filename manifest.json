@@ -1,6 +1,6 @@
 {
-  "name": "Trakd — Nutrition Tracker",
-  "short_name": "Trakd",
+  "name": "Booby's Food Tracker — Nutrition Tracker",
+  "short_name": "Booby's",
   "description": "See how today's food stacks up against your targets.",
   "start_url": "./index.html",
   "scope": "./",
