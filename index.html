@@ -23,6 +23,7 @@
     <section class="panel food-panel">
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="search">Search</button>
+        <button class="tab-btn" data-tab="scan">Scan Barcode</button>
         <button class="tab-btn" data-tab="estimate">Estimate a Meal</button>
         <button class="tab-btn" data-tab="meals">My Meals</button>
       </div>
@@ -48,6 +49,25 @@
         </div>
 
         <div id="food-list" class="food-list"></div>
+      </div>
+
+      <!-- Scan tab -->
+      <div id="tab-scan" class="tab-panel hidden">
+        <p class="form-hint">
+          Scans a product's barcode and looks it up in USDA's Branded Foods database
+          (retail packaged goods). Requires camera access and a secure (HTTPS) connection —
+          works when the app is installed to your home screen. Not every product is in the
+          database; if nothing turns up, search or add it manually.
+        </p>
+        <div class="scanner-frame">
+          <video id="scan-video" playsinline muted></video>
+        </div>
+        <p id="scan-status" class="form-hint scan-status"></p>
+        <div class="form-actions scanner-actions">
+          <button id="scan-start-btn" class="primary-btn full-width">Start Scanning</button>
+          <button id="scan-stop-btn" class="secondary-btn full-width hidden">Stop Scanning</button>
+        </div>
+        <div id="scan-result" class="food-list"></div>
       </div>
 
       <!-- Estimate tab -->

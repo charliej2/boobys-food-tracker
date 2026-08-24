@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Trakd</string>
+    <string name="title_activity_main">Trakd</string>
+    <string name="package_name">com.trakd.app</string>
+    <string name="custom_url_scheme">com.trakd.app</string>
+</resources>

@@ -56,6 +56,12 @@ const mealBuilderCancelBtn = document.getElementById("meal-builder-cancel-btn");
 const mealBuilderSaveBtn = document.getElementById("meal-builder-save-btn");
 const savedMealsListEl = document.getElementById("saved-meals-list");
 
+const scanVideoEl = document.getElementById("scan-video");
+const scanStartBtn = document.getElementById("scan-start-btn");
+const scanStopBtn = document.getElementById("scan-stop-btn");
+const scanStatusEl = document.getElementById("scan-status");
+const scanResultEl = document.getElementById("scan-result");
+
 const toggleSettingsBtn = document.getElementById("toggle-settings-btn");
 const settingsPanelEl = document.getElementById("settings-panel");
 const unitSystemSelect = document.getElementById("unit-system-select");
@@ -127,6 +133,10 @@ function switchTab(tabName) {
   document.querySelectorAll(".tab-panel").forEach((el) => el.classList.add("hidden"));
   document.getElementById(`tab-${tabName}`).classList.remove("hidden");
   document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tabName));
+  // Leaving the Scan tab should always release the camera, not just
+  // clicking "Stop Scanning" — otherwise the camera light stays on and
+  // the stream keeps running in the background after navigating away.
+  if (tabName !== "scan") stopScanning();
 }
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -193,6 +203,205 @@ function createSearchWidget({ inputEl, listEl, onSelect, placeholder }) {
 
   search("");
 }
+
+// ============================================================
+// Barcode scanning (camera -> UPC -> USDA Branded lookup)
+// ============================================================
+//
+// Prefers the browser-native BarcodeDetector API (Chrome/Edge/Android —
+// fast, no download needed). Falls back to the @zxing/library UMD build,
+// lazy-loaded from a CDN only when needed, for browsers that lack
+// BarcodeDetector (notably Safari/iOS, Firefox). Either path ends the same
+// way: a decoded UPC string handed to searchByUPCAPI.
+
+let scannerStream = null;
+let scannerRafId = null;
+let scanning = false;
+let nativeBarcodeDetector = null;
+let zxingReader = null;
+let zxingLibPromise = null;
+
+const SCAN_BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+
+function loadZXingLibrary() {
+  if (window.ZXing) return Promise.resolve(window.ZXing);
+  if (zxingLibPromise) return zxingLibPromise;
+  zxingLibPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js";
+    script.onload = () => (window.ZXing ? resolve(window.ZXing) : reject(new Error("Barcode scanner library failed to load.")));
+    script.onerror = () => reject(new Error("Couldn't load the barcode scanner library — check your internet connection and try again."));
+    document.head.appendChild(script);
+  });
+  return zxingLibPromise;
+}
+
+async function startScanning() {
+  scanResultEl.innerHTML = "";
+  scanStatusEl.textContent = "Requesting camera access…";
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false,
+    });
+  } catch (err) {
+    scanStatusEl.textContent = "Camera access denied or unavailable — you can still search or add foods manually.";
+    return;
+  }
+
+  scanVideoEl.srcObject = scannerStream;
+  try {
+    await scanVideoEl.play();
+  } catch (err) {
+    // Some browsers reject play() if the tab isn't focused yet; the video
+    // will still start once autoplay is allowed, so this isn't fatal.
+  }
+
+  scanning = true;
+  scanStartBtn.classList.add("hidden");
+  scanStopBtn.classList.remove("hidden");
+
+  if ("BarcodeDetector" in window) {
+    scanStatusEl.textContent = "Point your camera at a barcode…";
+    try {
+      const supported = await window.BarcodeDetector.getSupportedFormats();
+      const formats = SCAN_BARCODE_FORMATS.filter((f) => supported.includes(f));
+      nativeBarcodeDetector = new window.BarcodeDetector({ formats: formats.length ? formats : supported });
+    } catch (err) {
+      nativeBarcodeDetector = new window.BarcodeDetector();
+    }
+    runNativeDetectionLoop();
+    return;
+  }
+
+  scanStatusEl.textContent = "Loading barcode scanner…";
+  try {
+    const ZXing = await loadZXingLibrary();
+    if (!scanning) return; // user hit Stop while the library was loading
+    zxingReader = new ZXing.BrowserMultiFormatReader();
+    scanStatusEl.textContent = "Point your camera at a barcode…";
+    zxingReader.decodeFromVideoElement(scanVideoEl, (result) => {
+      if (result && scanning) handleBarcodeDetected(result.getText());
+    });
+  } catch (err) {
+    scanStatusEl.textContent = err.message;
+    stopScanning();
+  }
+}
+
+function runNativeDetectionLoop() {
+  if (!scanning || !nativeBarcodeDetector) return;
+  nativeBarcodeDetector
+    .detect(scanVideoEl)
+    .then((barcodes) => {
+      if (barcodes.length > 0) {
+        handleBarcodeDetected(barcodes[0].rawValue);
+      } else {
+        scannerRafId = requestAnimationFrame(runNativeDetectionLoop);
+      }
+    })
+    .catch(() => {
+      scannerRafId = requestAnimationFrame(runNativeDetectionLoop);
+    });
+}
+
+function stopScanning() {
+  const wasScanning = scanning;
+  scanning = false;
+
+  if (scannerRafId) {
+    cancelAnimationFrame(scannerRafId);
+    scannerRafId = null;
+  }
+  if (zxingReader) {
+    zxingReader.reset();
+    zxingReader = null;
+  }
+  if (scannerStream) {
+    scannerStream.getTracks().forEach((track) => track.stop());
+    scannerStream = null;
+  }
+  nativeBarcodeDetector = null;
+  scanVideoEl.srcObject = null;
+
+  scanStartBtn.classList.remove("hidden");
+  scanStopBtn.classList.add("hidden");
+  if (wasScanning) scanStatusEl.textContent = "";
+}
+
+async function handleBarcodeDetected(code) {
+  stopScanning();
+  scanStatusEl.textContent = `Scanned ${code} — looking it up…`;
+  scanResultEl.innerHTML = "";
+
+  try {
+    const results = await searchByUPCAPI(code);
+    renderScanResults(results, code);
+  } catch (err) {
+    scanStatusEl.textContent = "";
+    scanResultEl.innerHTML = `<p class="empty-state">${err.message}</p>`;
+  }
+}
+
+function renderScanResults(results, code) {
+  scanStatusEl.textContent = "";
+
+  if (results.length === 0) {
+    scanResultEl.innerHTML = `<p class="empty-state">No product found for barcode ${code} in USDA's Branded Foods database. Try searching manually, or add it as a custom food.</p>`;
+    return;
+  }
+
+  scanResultEl.innerHTML = "";
+  results.forEach((fdcFood) => {
+    const food = normalizeFdcFood(fdcFood);
+    foodCache.set(food.fdcId, food);
+    const health = calculateHealthScore(fdcFood, food);
+
+    const brand = fdcFood.brandOwner || fdcFood.brandName;
+    const row = document.createElement("div");
+    row.className = "food-item scan-result-item";
+    row.innerHTML = `
+      <div class="scan-result-main">
+        <div>
+          <div class="food-name">${food.name}</div>
+          <div class="food-category">${brand ? brand + " · " : ""}${food.dataType}</div>
+        </div>
+        <span class="add-icon">+</span>
+      </div>
+      ${renderHealthScoreHTML(health)}
+    `;
+    row.querySelector(".scan-result-main").addEventListener("click", () => addFoodEntry(food.fdcId));
+    scanResultEl.appendChild(row);
+  });
+}
+
+// Renders the health-score badge + "why" breakdown under a scanned product.
+// See calculateHealthScore in api.js for what the score/grade/lights mean
+// and its "rough guide, not a verdict" caveat.
+function renderHealthScoreHTML(health) {
+  const concerns = [...health.highConcernAdditives, ...health.moderateConcernAdditives];
+  const concernsHTML = concerns.length
+    ? `<div class="health-score-concerns">Contains: ${concerns.join(", ")}</div>`
+    : "";
+
+  return `
+    <div class="health-score-row">
+      <span class="health-score-badge" style="background:${health.grade.color}">
+        ${health.score}/100 · ${health.grade.label}
+      </span>
+      <span class="health-score-lights">
+        <span class="light-dot light-${health.sugarLight}" title="Sugar"></span>
+        <span class="light-dot light-${health.satFatLight}" title="Saturated fat"></span>
+        <span class="light-dot light-${health.saltLight}" title="Salt"></span>
+      </span>
+    </div>
+    ${concernsHTML}
+  `;
+}
+
+scanStartBtn.addEventListener("click", startScanning);
+scanStopBtn.addEventListener("click", stopScanning);
 
 // ============================================================
 // Log entries (selected foods / supplements / meal ingredients)

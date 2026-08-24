@@ -128,6 +128,61 @@ body {
   font-weight: 600;
 }
 
+/* Scan results add a health-score row below the name/add-icon line, so the
+   card as a whole switches to a column layout; only .scan-result-main (the
+   original name/category/+ row) keeps the food-item click-to-add behavior
+   and pointer cursor. */
+.scan-result-item {
+  cursor: default;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.scan-result-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.health-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.health-score-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.health-score-lights {
+  display: flex;
+  gap: 4px;
+}
+
+.light-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.light-dot.light-green { background: #1a7d3c; }
+.light-dot.light-amber { background: #e0a800; }
+.light-dot.light-red { background: #c0392b; }
+.light-dot.light-unknown { background: var(--text-muted); }
+
+.health-score-concerns {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .selected-list {
   display: flex;
   flex-direction: column;
@@ -627,6 +682,42 @@ body {
 }
 
 .tab-panel.hidden {
+  display: none;
+}
+
+/* --- Scan tab --- */
+
+.scanner-frame {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 4 / 3;
+  margin-bottom: 10px;
+}
+
+.scanner-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scan-status {
+  text-align: center;
+  min-height: 16px;
+}
+
+.scanner-actions {
+  flex-direction: column;
+}
+
+.scanner-actions .full-width {
+  margin-bottom: 8px;
+}
+
+.scanner-actions .hidden {
   display: none;
 }
 
