@@ -281,7 +281,14 @@ async function startScanning() {
     if (!scanning) return; // user hit Stop while the library was loading
     zxingReader = new ZXing.BrowserMultiFormatReader();
     scanStatusEl.textContent = "Point your camera at a barcode…";
-    zxingReader.decodeFromVideoElement(scanVideoEl, (result) => {
+    // decodeFromVideoElement (no "Continuously" suffix) only decodes a single
+    // frame at video-load time and ignores any callback passed to it — the
+    // result is a Promise nothing ever reads, so the scanner appeared to hang
+    // forever on any browser without native BarcodeDetector support (all of
+    // Safari/iOS, including this app's iOS build, which uses WKWebView).
+    // decodeFromVideoElementContinuously re-decodes on a timer until stopped
+    // and actually invokes the callback on every attempt.
+    zxingReader.decodeFromVideoElementContinuously(scanVideoEl, (result) => {
       if (result && scanning) handleBarcodeDetected(result.getText());
     });
   } catch (err) {

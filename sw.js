@@ -3,7 +3,7 @@
 // Central API responses — nutrition search results should always come from
 // the live API, never a stale cached copy. Bump CACHE_NAME whenever app
 // shell files change so old caches are cleared out on the next visit.
-const CACHE_NAME = "trakd-shell-v5";
+const CACHE_NAME = "trakd-shell-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
