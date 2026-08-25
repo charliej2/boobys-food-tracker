@@ -151,14 +151,18 @@ function createSearchWidget({ inputEl, listEl, onSelect, placeholder }) {
   let debounceTimer = null;
   let abortController = null;
 
-  function renderResults(results) {
-    if (results.length === 0) {
+  // Takes already-normalized foods ({fdcId, name, category, dataType,
+  // per100, fattyAcids}) — both the live USDA results and the local AFCD
+  // results are normalized to this shape before reaching here (see search()
+  // below), so this function doesn't need to know which source a food came
+  // from.
+  function renderResults(foods) {
+    if (foods.length === 0) {
       listEl.innerHTML = `<p class="empty-state">No foods found. Try a different search term.</p>`;
       return;
     }
     listEl.innerHTML = "";
-    results.forEach((fdcFood) => {
-      const food = normalizeFdcFood(fdcFood);
+    foods.forEach((food) => {
       foodCache.set(food.fdcId, food);
 
       const row = document.createElement("div");
@@ -187,12 +191,23 @@ function createSearchWidget({ inputEl, listEl, onSelect, placeholder }) {
     abortController = new AbortController();
     listEl.innerHTML = `<p class="empty-state">Searching…</p>`;
 
+    // AFCD is a bundled local dataset (no network needed), so it's cheap to
+    // compute up front regardless of how the live USDA call goes.
+    const afcdFoods = searchAfcdFoods(trimmed);
+
     try {
-      const results = await searchFoodsAPI(trimmed, abortController.signal);
-      renderResults(results);
+      const usdaResults = await searchFoodsAPI(trimmed, abortController.signal);
+      const usdaFoods = usdaResults.map(normalizeFdcFood);
+      renderResults([...usdaFoods, ...afcdFoods]);
     } catch (err) {
       if (err.name === "AbortError") return;
-      listEl.innerHTML = `<p class="empty-state">${err.message}</p>`;
+      // USDA unreachable/rate-limited — fall back to the local AFCD matches
+      // (if any) instead of a dead end, since that source needs no network.
+      if (afcdFoods.length > 0) {
+        renderResults(afcdFoods);
+      } else {
+        listEl.innerHTML = `<p class="empty-state">${err.message}</p>`;
+      }
     }
   }
 
@@ -421,7 +436,9 @@ function addFoodEntry(foodId, unitGrams = 1, unitLabel = "g", quantity = 100) {
   renderAll();
 
   const food = getFoodById(foodId);
-  if (food && !food.isCustom && food.portions === undefined) {
+  // AFCD foods are local-only (no USDA fdcId), so there's no
+  // /food/{fdcId} endpoint to fetch portions from — skip the doomed request.
+  if (food && !food.isCustom && food.dataType !== "AFCD" && food.portions === undefined) {
     loadPortionsForFood(foodId);
   }
 }

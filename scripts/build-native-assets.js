@@ -20,6 +20,7 @@ const FILES_TO_COPY = [
   "index.html",
   "style.css",
   "data.js",
+  "afcd-data.js",
   "config.js",
   "api.js",
   "app.js",

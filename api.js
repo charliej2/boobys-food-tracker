@@ -142,6 +142,40 @@ async function searchByUPCAPI(upc, signal) {
   return exact.length > 0 ? exact : foods;
 }
 
+// Local search over the bundled AFCD (Australian Food Composition Database)
+// dataset — see afcd-data.js. AFCD is a static download with no live API, so
+// this runs entirely client-side (no network) against the AFCD_FOODS array
+// defined there, and complements the live USDA search rather than replacing
+// it: USDA Foundation/SR Legacy covers generic foods well but with US-centric
+// naming/coverage, while AFCD adds Australian foods and works even if USDA
+// is unreachable.
+//
+// AFCD names are stored "Category, descriptor, descriptor…" (e.g. "Chicken,
+// breast, lean flesh, raw") rather than natural-language phrasing like
+// "Chicken breast" — a literal substring match against the raw query would
+// miss most everyday searches. Token matching (every query word must appear
+// somewhere in the name, in any order) handles both phrasings.
+function searchAfcdFoods(query, limit = 15) {
+  if (typeof AFCD_FOODS === "undefined") return [];
+
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+
+  const scored = [];
+  for (const food of AFCD_FOODS) {
+    const lowerName = food.name.toLowerCase();
+    if (!tokens.every((t) => lowerName.includes(t))) continue;
+    // Prefer names where the first query word appears earliest (closer to a
+    // literal match), then shorter names as a secondary tiebreaker (more
+    // likely to be the plain/generic form rather than a specific dish).
+    const firstIndex = lowerName.indexOf(tokens[0]);
+    scored.push({ food, firstIndex, length: lowerName.length });
+  }
+
+  scored.sort((a, b) => a.firstIndex - b.firstIndex || a.length - b.length);
+  return scored.slice(0, limit).map((s) => s.food);
+}
+
 // Extracts a typical gram portion for a dish-estimate search result.
 // Search results (unlike the food-detail endpoint) sometimes include a
 // single representative portion in foodMeasures; falls back to a sane
